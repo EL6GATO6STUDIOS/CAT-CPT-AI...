@@ -1,0 +1,6 @@
+streamlit
+pytesseract
+Pillow
+googlesearch-python
+requests
+beautifulsoup4
