@@ -1,82 +1,92 @@
 import streamlit as st
-import pytesseract
+from PyPDF2 import PdfReader
 from PIL import Image
 from googlesearch import search
-import os
-import datetime
+import requests
+from bs4 import BeautifulSoup
+import random
 
-st.set_page_config(page_title="Cat CPT", layout="centered")
+st.set_page_config(page_title="Cat CPT 😺", layout="wide")
+st.title("Cat CPT 😺")
 
-# Konuları saklamak için session state
-if "conversations" not in st.session_state:
-    st.session_state.conversations = []
-if "current_topic" not in st.session_state:
-    st.session_state.current_topic = "Genel Konuşma"
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# Yeni konu başlat butonu
-if st.button("➕ Yeni Konu"):
-    st.session_state.current_topic = f"Konu ({datetime.datetime.now().strftime('%H:%M:%S')})"
-    st.session_state.conversations.append((st.session_state.current_topic, []))
+text = st.text_input("Sorunuzu yazın:")
 
-# Konu seçimi veya oluşturulmamışsa ilk konu
-if len(st.session_state.conversations) == 0:
-    st.session_state.conversations.append((st.session_state.current_topic, []))
+uploaded_file = st.file_uploader("Bir dosya yükleyin (.pdf, .txt, .jpg, .png)", type=["pdf", "txt", "jpg", "jpeg", "png"])
 
-# Mevcut konu verisine referans
-topic_index = next(i for i, (t, _) in enumerate(st.session_state.conversations) if t == st.session_state.current_topic)
-messages = st.session_state.conversations[topic_index][1]
+if uploaded_file is not None:
+    file_type = uploaded_file.type
+    st.subheader("Yüklenen Dosya:")
 
-# Konu başlığı
-st.markdown(f"## 🧠 {st.session_state.current_topic}")
+    if "pdf" in file_type:
+        reader = PdfReader(uploaded_file)
+        all_text = ""
+        for page in reader.pages:
+            all_text += page.extract_text()
+        st.text_area("PDF İçeriği", all_text)
 
-# Geçmiş konuşmaları göster
-for i, (sender, msg) in enumerate(messages):
-    with st.chat_message(sender):
-        st.markdown(msg)
+    elif "text" in file_type:
+        content = uploaded_file.read().decode("utf-8")
+        st.text_area("Metin Dosyası İçeriği", content)
 
-# Giriş kutusu ve dosya yükleme
-with st.container():
-    user_input = st.chat_input("Mesajınızı yazın...")
-    uploaded_file = st.file_uploader("📎 Dosya/Fotograf", type=["png", "jpg", "jpeg", "txt", "pdf"], label_visibility="collapsed")
+    elif "image" in file_type:
+        img = Image.open(uploaded_file)
+        st.image(img, caption="Yüklenen Görsel", use_column_width=True)
 
-# Mesaj gönderildiyse
-if user_input or uploaded_file:
-    if user_input:
-        messages.append(("user", user_input))
-        with st.chat_message("user"):
-            st.markdown(user_input)
+def generate_opinion_response(user_input):
+    fikir_sablonlari = [
+        "Bence bu oldukça düşündürücü. {} konusu, insanların karakterine ve bakış açısına göre değişir.",
+        "{} hakkında kendi fikrimi söylemem gerekirse: bu konuda oldukça net bir görüşüm var.",
+        "Açıkçası ben {} konusuna pek sıcak bakmıyorum. Ama herkesin fikrine saygı duyarım.",
+        "{} bana kalırsa günümüzde sıkça tartışılan bir mesele. Bence önemli olan kişinin yaklaşımıdır.",
+        "{} konusunu düşündüğümde aklıma gelen ilk şey: insanları yargılamadan önce anlamaya çalışmak.",
+        "Kendi bakış açıma göre, {} biraz abartılıyor olabilir. Ama yine de farklı düşünceler değerlidir.",
+        "{} ile ilgili fikrim şu: bu durum tamamen bağlama göre değişebilir, ama genel olarak destekliyorum.",
+    ]
+    sablon = random.choice(fikir_sablonlari)
+    return sablon.format(user_input.capitalize())
 
-        if any(user_input.lower().startswith(q) for q in ["nedir", "kim", "nasıl", "ne", "kaç"]):
-            query = user_input.strip()
-            result_links = list(search(query, num_results=2))
-            answer = "\n\n".join([f"🔗 [{link}]({link})" for link in result_links])
-            messages.append(("assistant", f"İşte bulduklarım:\n{answer}"))
-            with st.chat_message("assistant"):
-                st.markdown(f"İşte bulduklarım:\n{answer}")
-        elif any(x in user_input.lower() for x in ["yorumla", "analiz et"]):
-            answer = f"Bu konuda şöyle düşünüyorum: {user_input} oldukça ilginç bir konu. İçeriğini değerlendirirken hem bağlam hem de niyet göz önüne alınmalı."
-            messages.append(("assistant", answer))
-            with st.chat_message("assistant"):
-                st.markdown(answer)
-        else:
-            answer = f"Söylediğini anladım: '{user_input}'. Sana nasıl yardımcı olabilirim?"
-            messages.append(("assistant", answer))
-            with st.chat_message("assistant"):
-                st.markdown(answer)
+if text:
+    original_text = text
+    lower_text = text.lower()
 
-    if uploaded_file:
-        filetype = uploaded_file.type
-        messages.append(("user", f"📎 Dosya yüklendi: {uploaded_file.name}"))
-        with st.chat_message("user"):
-            st.markdown(f"📎 Dosya yüklendi: {uploaded_file.name}")
+    if any(word in lower_text for word in ["selam", "merhaba"]):
+        response = "Selam! Size nasıl yardımcı olabilirim?"
+    elif any(word in lower_text for word in ["naber", "nasılsın"]):
+        response = "İyiyim, sen nasılsın?"
+    elif "teşekkür" in lower_text:
+        response = "Rica ederim! 😊"
+    elif any(keyword in lower_text for keyword in ["sence", "yorumla", "analiz", "ne düşünüyorsun", "karakter", "tartış", "duygusal", "kişilik"]):
+        response = generate_opinion_response(original_text)
+    else:
+        response = "Araştırılıyor..."
+        try:
+            results = list(search(original_text, num_results=1))
+            if results:
+                url = results[0]
+                res = requests.get(url, timeout=10)
+                soup = BeautifulSoup(res.text, "html.parser")
+                paragraphs = soup.find_all("p")
+                found = False
+                for p in paragraphs:
+                    if len(p.text.strip()) > 50:
+                        bilgi = p.text.strip()
+                        response = f"Sorduğun şeyle ilgili şöyle bir bilgiye ulaştım: {bilgi}"
+                        found = True
+                        break
+                if not found:
+                    response = "Uygun bir bilgi bulunamadı."
+            else:
+                response = "Sonuç bulunamadı."
+        except Exception as e:
+            response = f"Araştırma sırasında bir hata oluştu: {str(e)}"
 
-        if filetype.startswith("image"):
-            image = Image.open(uploaded_file)
-            text = pytesseract.image_to_string(image)
-            messages.append(("assistant", f"📖 Görselden okunan metin:\n{text}"))
-            with st.chat_message("assistant"):
-                st.markdown(f"📖 Görselden okunan metin:\n{text}")
-        else:
-            messages.append(("assistant", "🔍 Bu dosya türü şu anda desteklenmiyor."))
-            with st.chat_message("assistant"):
-                st.markdown("🔍 Bu dosya türü şu anda desteklenmiyor.")
+    st.session_state.chat_history.append((original_text, response))
+
+if st.session_state.chat_history:
+    st.subheader("🧠 Sohbet Geçmişi")
+    for i, (q, a) in enumerate(st.session_state.chat_history, start=1):
+        st.markdown(f"{i}. **Soru:** {q}")
+        st.markdown(f"{i}. **Cevap:** {a}")
