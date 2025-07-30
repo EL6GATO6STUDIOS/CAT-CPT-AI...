@@ -1,6 +1,6 @@
 streamlit
-pytesseract
-Pillow
-googlesearch-python
-requests
+pillow
+PyPDF2
 beautifulsoup4
+requests
+googlesearch-python
