@@ -1,6 +1,7 @@
 import streamlit as st
 from PyPDF2 import PdfReader
 from PIL import Image
+import pytesseract
 from googlesearch import search
 import requests
 from bs4 import BeautifulSoup
@@ -34,6 +35,8 @@ if uploaded_file is not None:
     elif "image" in file_type:
         img = Image.open(uploaded_file)
         st.image(img, caption="Yüklenen Görsel", use_column_width=True)
+        text = pytesseract.image_to_string(img)
+        st.text_area("Görseldeki Yazı", text)
 
 def generate_opinion_response(user_input):
     fikir_sablonlari = [
@@ -63,7 +66,8 @@ if text:
     else:
         response = "Araştırılıyor..."
         try:
-            results = list(search(original_text, num_results=1))
+            query = original_text
+            results = list(search(query, num_results=1))
             if results:
                 url = results[0]
                 res = requests.get(url, timeout=10)
@@ -71,9 +75,9 @@ if text:
                 paragraphs = soup.find_all("p")
                 found = False
                 for p in paragraphs:
-                    if len(p.text.strip()) > 50:
-                        bilgi = p.text.strip()
-                        response = f"Sorduğun şeyle ilgili şöyle bir bilgiye ulaştım: {bilgi}"
+                    text = p.text.strip()
+                    if len(text) > 50:
+                        response = f"Sorduğun konuyla ilgili şunu buldum: {text}"
                         found = True
                         break
                 if not found:
@@ -88,5 +92,5 @@ if text:
 if st.session_state.chat_history:
     st.subheader("🧠 Sohbet Geçmişi")
     for i, (q, a) in enumerate(st.session_state.chat_history, start=1):
-        st.markdown(f"{i}. **Soru:** {q}")
-        st.markdown(f"{i}. **Cevap:** {a}")
+        st.markdown(f"**{i}. Soru:** {q}")
+        st.markdown(f"**{i}. Cevap:** {a}")
