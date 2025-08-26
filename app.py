@@ -1,124 +1,52 @@
-import streamlit as st
-from PyPDF2 import PdfReader
-from PIL import Image
-from googlesearch import search
+    import streamlit as st
 import requests
-from bs4 import BeautifulSoup
-import random
 import json
 
-# ---- TDK sözlükten anlam bulma ----
-def tdk_lookup(word):
-    url = f"https://sozluk.gov.tr/gts?ara={word}"
-    try:
-        res = requests.get(url, timeout=10)
-        data = res.json()
-        if isinstance(data, list) and len(data) > 0:
-            return data[0]["anlamlarListe"][0]["anlam"]
-        return None
-    except:
-        return None
+st.set_page_config(page_title="Cat CPT 😺", layout="wide")
+st.title("Cat CPT 😺")
 
-# ---- Rastgele analiz cümlesi üretme ----
-def generate_opinion_response(user_input):
-    fikir_sablonlari = [
-        "Bence {} konusu oldukça düşündürücü. İnsanların karakterine ve bakış açısına göre farklılık gösterebilir.",
-        "{} hakkında kendi fikrimi söylemem gerekirse: bu konuda birçok açıdan değerlendirme yapılabilir.",
-        "Açıkçası ben {} konusuna farklı bir gözle bakıyorum. Ama herkesin fikrine saygı duyarım.",
-        "{} bana kalırsa günümüzde çokça tartışılan bir mesele. Önemli olan kişinin yaklaşımıdır.",
-        "{} konusunu düşündüğümde, insanların bunu farklı yorumlayabileceğini görüyorum.",
-        "Kendi bakış açıma göre, {} biraz abartılıyor olabilir. Ama yine de farklı görüşler değerlidir.",
-        "{} ile ilgili fikrim şu: bu tamamen bağlama göre değişir, ama genel olarak önemli bir konudur.",
-    ]
-    sablon = random.choice(fikir_sablonlari)
-    return sablon.format(user_input.capitalize())
+API_URL = "http://localhost:8000/v1/chat/completions"  # API adresi
+API_KEY = "public-key-123"  # ortak key
 
-# ---- Sayfa ayarları ----
-st.set_page_config(page_title="Cat CPT 😺 (v1.05)", layout="wide")
-st.title("Cat CPT 😺 (v1.05)")
-
-# ---- Sohbet geçmişi ----
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# ---- Kullanıcı giriş alanı ----
-text = st.text_input("Sorunuzu yazın:")
+# Kullanıcıdan giriş al
+user_input = st.chat_input("Mesajınızı yazın...")
 
-# ---- Dosya yükleme alanı ----
-uploaded_file = st.file_uploader("Bir dosya yükleyin (.pdf, .txt, .jpg, .png)",
-                                 type=["pdf", "txt", "jpg", "jpeg", "png"])
+if user_input:
+    # Kullanıcı mesajını göster
+    st.session_state.chat_history.append(("user", user_input))
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-# ---- Dosya gösterimi ----
-if uploaded_file is not None:
-    file_type = uploaded_file.type
-    st.subheader("Yüklenen Dosya:")
+    headers = {"x-api-key": API_KEY}
+    payload = {
+        "messages": [{"role": "user", "content": user_input}]
+    }
 
-    if "pdf" in file_type:
-        reader = PdfReader(uploaded_file)
-        all_text = ""
-        for page in reader.pages:
-            all_text += page.extract_text()
-        st.text_area("PDF İçeriği", all_text)
+    # Asistan cevabını yazdır
+    with st.chat_message("assistant"):
+        response_box = st.empty()
+        full_response = ""
 
-    elif "text" in file_type:
-        content = uploaded_file.read().decode("utf-8")
-        st.text_area("Metin Dosyası İçeriği", content)
-
-    elif "image" in file_type:
-        img = Image.open(uploaded_file)
-        st.image(img, caption="Yüklenen Görsel", use_column_width=True)
-
-# ---- Kullanıcı metni işleme ----
-if text:
-    original_text = text
-    lower_text = text.lower()
-
-    # Sözlük araması isteyen sorular
-    if any(keyword in lower_text for keyword in ["ne demek", "anlamı", "nedir", "kelime"]):
-        kelimeler = original_text.split()
-        cevaplar = []
-        for kelime in kelimeler:
-            meaning = tdk_lookup(kelime)
-            if meaning:
-                cevaplar.append(f"**{kelime}**: {meaning}")
-        if cevaplar:
-            response = "📖 TDK Sözlüğüne göre:\n" + "\n".join(cevaplar)
-        else:
-            response = "Aradığınız kelimelerin anlamını bulamadım."
-
-    # Analiz (yorumlama) isteyen ifadeler
-    elif any(keyword in lower_text for keyword in ["sence", "yorumla", "analiz", "ne düşünüyorsun", "karakter", "tartış", "duygusal", "kişilik"]):
-        response = generate_opinion_response(original_text)
-
-    # Diğer tüm sorular için Google araştırması
-    else:
-        response = "Araştırılıyor..."
         try:
-            results = list(search(original_text, num_results=1))
-            if results:
-                url = results[0]
-                res = requests.get(url, timeout=10)
-                soup = BeautifulSoup(res.text, "html.parser")
-                paragraphs = soup.find_all("p")
-                found = False
-                for p in paragraphs:
-                    if len(p.text.strip()) > 50:
-                        response = f"Sorduğun şeyle ilgili şöyle bir bilgi buldum: {p.text.strip()}"
-                        found = True
-                        break
-                if not found:
-                    response = "Uygun bir bilgi bulunamadı."
-            else:
-                response = "Sonuç bulunamadı."
+            with requests.post(API_URL, json=payload, headers=headers, stream=True, timeout=60) as r:
+                for line in r.iter_lines():
+                    if line:
+                        decoded = line.decode("utf-8")
+                        if decoded.startswith("data: "):
+                            data = decoded[6:]
+                            if data.strip() == "[DONE]":
+                                break
+                            try:
+                                content = json.loads(data)["choices"][0]["delta"].get("content", "")
+                                full_response += content
+                                response_box.markdown(full_response)
+                            except Exception:
+                                continue
         except Exception as e:
-            response = f"Araştırma sırasında bir hata oluştu: {str(e)}"
+            full_response = f"⚠️ Sunucuya bağlanırken hata oluştu: {e}"
+            response_box.markdown(full_response)
 
-    # ---- Sohbet geçmişine ekle ----
-    st.session_state.chat_history.append((original_text, response))
-
-# ---- Geçmişi sırayla göster ----
-if st.session_state.chat_history:
-    st.subheader("🧠 Sohbet Geçmişi")
-    for i, (q, a) in enumerate(st.session_state.chat_history, start=1):
-        st.markdown(f"**{i}. Soru:** {q}")
-        st.markdown(f"**{i}. Cevap:** {a}")
+    st.session_state.chat_history.append(("assistant", full_response))
