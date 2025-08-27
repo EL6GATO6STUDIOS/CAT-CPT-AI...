@@ -33,15 +33,13 @@ if user_input:
     original_text = user_input
     lower_text = user_input.lower()
 
-    # Gündelik konuşmalar yerine her şeyi kendi üretir
     if any(keyword in lower_text for keyword in ["sence", "yorumla", "analiz", "ne düşünüyorsun", "karakter", "tartış", "duygusal", "kişilik"]):
         response = generate_opinion_response(original_text)
 
     else:
-        # Google'dan araştırma yap
         try:
             response = "Araştırılıyor..."
-            results = list(search(original_text, num_results=1))
+            results = list(search(original_text, num=1, stop=1, pause=2))
             if results:
                 url = results[0]
                 res = requests.get(url, timeout=10)
@@ -61,9 +59,14 @@ if user_input:
         except Exception as e:
             response = f"Araştırma sırasında bir hata oluştu: {str(e)}"
 
-    # Sohbet geçmişine ekle
     st.session_state.chat_history.append((original_text, response))
 
+# Sohbet geçmişini göster
+if st.session_state.chat_history:
+    st.subheader("🧠 Sohbet Geçmişi")
+    for i, (q, a) in enumerate(st.session_state.chat_history, start=1):
+        st.markdown(f"**{i}. Soru:** {q}")
+        st.markdown(f"**{i}. Cevap:** {a}")
 # Sohbet geçmişini göster
 if st.session_state.chat_history:
     st.subheader("🧠 Sohbet Geçmişi")
