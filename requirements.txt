@@ -1,5 +1,7 @@
 streamlit
 requests
-fastapi
-uvicorn
-vllm
+beautifulsoup4
+googlesearch-python
+Pillow
+PyPDF2
+pytesseract
